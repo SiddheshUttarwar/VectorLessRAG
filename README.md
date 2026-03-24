@@ -1,88 +1,186 @@
-# Google Drive FAQ Chatbot
+# 🤖 Vectorless RAG FAQ Chatbot
 
-This project is a powerful but simple AI Chatbot designed to read documents directly from your Google Drive and answer questions on your website based *only* on those documents. 
+An AI-powered FAQ chatbot that reads your documents directly from **Google Drive** and answers questions based solely on your content — no vector databases, no complex setup.
 
-It does not require complex database setups, making it perfect for business owners who want to keep their FAQ data easily editable in Google Docs or Sheets.
-
-## 🔑 What You Need Before Starting
-
-You only need three things to make this work:
-
-1. **OpenAI API Key**: Go to [platform.openai.com](https://platform.openai.com/) and create an account to get a secret API key.
-2. **Google Drive Folder ID**: Create a distinct folder in Google Drive and put your FAQ documents (PDFs, Google Docs, Sheets, Text files) inside. Look at the URL of the folder (e.g., `https://drive.google.com/drive/folders/1ABCDEFG123456`) — the `1ABCDEFG123456` part is your Folder ID.
-3. **Google API Credentials**: You need a `credentials.json` file. See the section below for exact steps on how to get this.
+> Built with **Python + FastAPI + OpenAI + Google Drive API**
 
 ---
 
-## 🛠️ Step-by-Step: How to get your Google `credentials.json`
+## 📁 Project Structure
 
-Because this app reads from your Google Drive, Google requires you to prove you own the app using OAuth. Follow these exact steps:
+```
+VectorLessRAG/
+├── main.py                 # FastAPI server & chat endpoints
+├── drive_loader.py         # Google Drive sync & OpenAI compression
+├── requirements.txt        # Python dependencies
+├── .env                    # Your secret API keys (never committed)
+├── credentials.json        # Google OAuth credentials (never committed)
+├── token.json              # Auto-generated Google auth token (never committed)
+├── context_cache.txt       # Auto-generated compressed knowledge base
+└── processed_files.json    # Auto-generated state tracker for incremental sync
+```
 
-1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)**.
-2. **Create a Project**: Look at the top left (next to the Google Cloud logo), click the dropdown, and click **New Project**. Name it "FAQ Chatbot" and click Create. Make sure this new project is selected.
-3. **Enable the Drive API**: 
-   - In the top search bar, type **"Google Drive API"** and click on the official result.
-   - Click the blue **Enable** button.
-4. **Configure the Consent Screen**:
-   - On the left sidebar, click **OAuth consent screen**.
+---
+
+## 🔑 Prerequisites
+
+### 1. OpenAI API Key
+Go to [platform.openai.com](https://platform.openai.com/) → API Keys → Create new secret key.
+
+### 2. Google Drive Folder ID
+Create a dedicated folder in Google Drive and put your FAQ documents inside (PDFs, Google Docs, Google Sheets, or .txt files). The Folder ID is the last part of the folder's URL:
+```
+https://drive.google.com/drive/folders/[THIS_PART_IS_YOUR_FOLDER_ID]
+```
+
+### 3. Google OAuth `credentials.json`
+These steps let the bot securely read your Drive without needing your password:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+2. Search for **"Google Drive API"** and click **Enable**.
+3. Go to **APIs & Services → OAuth consent screen**:
    - Choose **External** and click Create.
-   - Fill in the required fields (App name: "FAQ Bot", User support email: your email, Developer contact information: your email). You can leave everything else blank.
-   - Click **Save and Continue** until you reach the "Test Users" page.
-   - **Crucial**: Under "Test users", click **Add Users** and add your own Google email address so you have permission to test it. Click Save and Continue, then Back to Dashboard.
-5. **Create the Credentials**:
-   - On the left sidebar, click **Credentials**.
-   - Click **+ CREATE CREDENTIALS** at the top and select **OAuth client ID**.
-   - Under "Application type", choose **Desktop app** (even though this will eventually run on a server, for the initial authentication step, "Desktop app" is required).
-   - Name it "Local Bot" and click Create.
-   - A window will pop up. Click **DOWNLOAD JSON**.
-6. **Rename and Move**:
-   - Find the downloaded file on your computer.
-   - Rename it to exactly `credentials.json` (make sure it doesn't accidentally become `credentials.json.json`).
-   - Drag and drop it into this `VectorLessRAG` project folder.
+   - Fill in App Name and your email. Click Save and Continue through all steps.
+   - On the **Test users** page, click **+ Add Users** and add the Google email you will login with.
+4. Go to **APIs & Services → Credentials** → **+ Create Credentials → OAuth client ID**:
+   - Application type: **Desktop app**
+   - Click Create, then **Download JSON**.
+5. Rename the downloaded file to `credentials.json` and place it in the project folder.
 
 ---
 
-## 💻 Initial Setup (For Local Testing)
+## 🛠️ Setup
 
-1. **Install Python**: Make sure you have Python installed on your computer.
-2. **Add Your Keys**: Open the `.env` file in this folder and add your OpenAI Key and your Google Drive Folder ID.
-3. **Run the Setup**: 
-   Open your terminal/command prompt in this folder and run:
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate   # (On Windows)
-   pip install -r requirements.txt
-   ```
-4. **Start the Chatbot Server**:
-   ```bash
-   uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-   ```
-5. **Load Your Documents**: Go to `http://127.0.0.1:8000/docs` in your browser. Click on the `/refresh_context` endpoint and click "Try it out" -> "Execute". 
-   - *A Google Login window will pop up.* Log in with the email you added as a "Test user" in Step 4.
-   - Google might say "Google hasn't verified this app." Click **Advanced** -> **Go to FAQ Bot (unsafe)**.
-   - Click **Continue** to give it access.
-   - Your text will now download! Notice that a file called `token.json` has appeared in your folder. This remembers your login.
+```bash
+# 1. Create and activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate      # Windows
+source venv/bin/activate     # Mac/Linux
 
-## 🚀 How to Connect This to Your Website
+# 2. Install dependencies
+pip install -r requirements.txt
 
-To put this on your live website, you need to "host" this code on a server so it runs 24/7.
+# 3. Fill in your .env file
+```
 
-### Step 1: Hosting the Backend API
-We recommend using a beginner-friendly cloud service like **Render.com** or **Heroku**:
-1. Upload this folder to a private GitHub repository.
-2. Create an account on Render.com and create a new "Web Service".
-3. Connect it to your GitHub repository.
-4. Render will ask for a **Start Command**. Type: `uvicorn main:app --host 0.0.0.0 --port 10000`
-5. In Render's "Environment Variables" section, add your `OPENAI_API_KEY` and `GOOGLE_DRIVE_FOLDER_ID`.
-6. *(Important: Because cloud servers do not have web browsers to log in with, you MUST run Step 5 locally on your computer first. This generates the `token.json` file. You must upload this `token.json` securely to your cloud server or add its contents to the environment variables so it remembers your login!)*
+Open `.env` and add your keys:
+```env
+OPENAI_API_KEY="sk-..."
+GOOGLE_DRIVE_FOLDER_ID="your_folder_id_here"
+BOT_API_KEY=""              # Leave empty during development; set a secret for production
+```
 
-### Step 2: Adding the Chat Box to Your Website
-Once your API is hosted (e.g., `https://my-chatbot.onrender.com`), you can add a simple chat interface to your website. 
+---
 
-Whenever a user types a message in the chat box, your website's interface just needs to send a request to `https://my-chatbot.onrender.com/chat` formatted like this:
+## 🚀 Running Locally
+
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Open **http://127.0.0.1:8000/docs** to use the Swagger UI.
+
+### Step 1 — Load Your Documents
+Hit the **POST /refresh_context** endpoint. On the first run, a Google login popup will appear — log in with your whitelisted Google account. Google may show a warning; click **Advanced → Go to app (unsafe)** to proceed.
+
+The bot will:
+1. Scan all files in your Google Drive folder
+2. Download only new or changed files (incremental sync)
+3. Use OpenAI to merge and deduplicate the content into a clean knowledge base
+4. Save it to `context_cache.txt`
+
+On subsequent runs, unchanged files are **skipped entirely** — saving time and API tokens.
+
+### Step 2 — Chat
+Hit the **POST /chat** endpoint with:
 ```json
 {
-  "message": "What are your shipping times?"
+  "message": "What are your business hours?",
+  "history": []
 }
 ```
-And the bot will reply with the exact answer extracted directly from your Google Drive files!
+Pass previous messages in `history` to maintain a multi-turn conversation.
+
+---
+
+## 🔗 API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/chat` | Send a message and get a response |
+| `POST` | `/refresh_context` | Sync new/updated files from Google Drive |
+| `GET`  | `/health` | Check server health |
+
+### `/chat` Request Body
+```json
+{
+  "message": "Your question here",
+  "history": [
+    { "role": "user",      "content": "Previous question" },
+    { "role": "assistant", "content": "Previous answer" }
+  ]
+}
+```
+
+### 🔒 API Key Header (Production)
+Set `BOT_API_KEY` in `.env` to any secret string. All requests must then include the header:
+```
+X-API-KEY: your-secret-key
+```
+If `BOT_API_KEY` is empty, the security check is **automatically disabled** (for local development).
+
+---
+
+## 🤖 Customizing the Bot's Personality
+
+Edit the `system_prompt` in `main.py` to change how the bot behaves:
+
+```python
+system_prompt = (
+    "You are a professional, empathetic customer support agent. "
+    "Always start your message by thanking the user for their question. "
+    "Always end your message by offering them to email support@mycompany.com if they need more help. "
+    "Use the provided context documents to answer the user's questions. "
+    "Do not make up information that is not in the context."
+)
+```
+
+The server **hot-reloads** on save, so changes take effect immediately.
+
+---
+
+## 🌐 Deploying to Production (Render.com)
+
+1. Push this repo to a **private** GitHub repository (your `.env`, `credentials.json`, `token.json` are all gitignored).
+2. Create a new **Web Service** on [render.com](https://render.com) connected to your repo.
+3. Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port 10000`
+4. Add Environment Variables on Render: `OPENAI_API_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `BOT_API_KEY`.
+5. **Important**: Run the bot locally first to generate `token.json`, then add its contents as a `token.json` Secret File on Render (under Environment → Secret Files).
+
+### Adding the Chat Widget to Your Website
+Once deployed (e.g., `https://my-chatbot.onrender.com`), call the API from your website's JavaScript:
+
+```javascript
+let history = [];
+
+async function sendMessage(userMessage) {
+  const res = await fetch("https://my-chatbot.onrender.com/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-KEY": "your-secret-key"
+    },
+    body: JSON.stringify({ message: userMessage, history: history })
+  });
+  const data = await res.json();
+  history.push({ role: "user", content: userMessage });
+  history.push({ role: "assistant", content: data.response });
+  return data.response;
+}
+```
+
+---
+
+## ⚠️ Scaling Limits
+
+This project uses the **Full-Context** approach — all document text is sent to OpenAI on every request. The model (`gpt-4o-mini`) supports ~128K tokens (~300 pages). If your knowledge base grows beyond that, consider migrating to a vector database (e.g., ChromaDB or Pinecone) for chunked retrieval.
