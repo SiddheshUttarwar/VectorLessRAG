@@ -1,6 +1,5 @@
 .git
 .gitignore
-.env
 venv/
 __pycache__/
 *.pyc
@@ -9,3 +8,4 @@ __pycache__/
 # so you don't have to deal with Google Secret Manager file volume mounts.
 !credentials.json
 !token.json
+!.env
