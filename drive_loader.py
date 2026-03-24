@@ -151,10 +151,7 @@ def load_folder_contents():
     # If no files were updated or added, we stop here entirely and skip OpenAI!
     if files_processed == 0:
         print("No new or updated files found in Google Drive. Knowledge base is already up to date!")
-        if os.path.exists(CONTEXT_CACHE_FILE):
-            with open(CONTEXT_CACHE_FILE, "r", encoding="utf-8") as f:
-                return f.read()
-        return ""
+        return 0, "All files are already up to date — nothing to sync!"
             
     print(f"Extracted {files_processed} new/updated files. Merging into existing Knowledge Base via OpenAI...")
     
@@ -202,7 +199,7 @@ def load_folder_contents():
         f.write(final_context)
     
     print(f"Successfully wrote optimized summary to {CONTEXT_CACHE_FILE}")
-    return final_context
+    return files_processed, f"✅ {files_processed} file{'s' if files_processed != 1 else ''} successfully synced and merged into knowledge base!"
 
 if __name__ == '__main__':
     load_folder_contents()

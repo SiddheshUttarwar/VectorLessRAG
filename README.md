@@ -72,34 +72,32 @@ BOT_API_KEY=""              # Leave empty during development; set a secret for p
 
 ---
 
+## ✨ Features
+
+- **Business Analytics Dashboard**: A premium, Flouv-inspired web dashboard with KPI cards and Chart.js visualizations.
+- **Auto-Topic Classification**: Every user question is automatically categorized into business topics (e.g., Pricing, Shipping, Returns) with zero extra LLM calls.
+- **Server-Side Session Memory**: The bot remembers conversation history per session flawlessly.
+- **Incremental Drive Sync**: Downloads only new or modified files, drastically saving API costs, with a live progress modal.
+- **Vectorless Compression**: Merges all documents into a single optimized `context_cache.txt`, injected directly into the prompt.
+- **API Security**: Built-in API key validation for production deployments.
+
+---
+
 ## 🚀 Running Locally
 
 ```bash
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Open **http://127.0.0.1:8000/docs** to use the Swagger UI.
+### 1. The Interactive Dashboard
+Open **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)** in your browser to access the full Business Intelligence Dashboard.
+- **Analytics Tab**: View total questions, active sessions, topic distributions, and the most asked questions.
+- **Chat Tab**: Test the bot with a beautiful, real-time UI showing live topic thread tracking.
+- **Sync Drive**: Click the "Sync Drive" button in the navbar to securely pull the latest files from your Google Drive. 
 
-### Step 1 — Load Your Documents
-Hit the **POST /refresh_context** endpoint. On the first run, a Google login popup will appear — log in with your whitelisted Google account. Google may show a warning; click **Advanced → Go to app (unsafe)** to proceed.
-
-The bot will:
-1. Scan all files in your Google Drive folder
-2. Download only new or changed files (incremental sync)
-3. Use OpenAI to merge and deduplicate the content into a clean knowledge base
-4. Save it to `context_cache.txt`
-
-On subsequent runs, unchanged files are **skipped entirely** — saving time and API tokens.
-
-### Step 2 — Chat
-Hit the **POST /chat** endpoint with:
-```json
-{
-  "message": "What are your business hours?",
-  "history": []
-}
-```
-Pass previous messages in `history` to maintain a multi-turn conversation.
+### 2. Testing the API Directly
+To test the raw API endpoints using the auto-generated Swagger UI, open:
+**[http://127.0.0.1:8000/docs#/default/chat_with_bot_chat_post](http://127.0.0.1:8000/docs#/default/chat_with_bot_chat_post)**
 
 ---
 
@@ -107,23 +105,24 @@ Pass previous messages in `history` to maintain a multi-turn conversation.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/chat` | Send a message and get a response |
-| `POST` | `/refresh_context` | Sync new/updated files from Google Drive |
-| `GET`  | `/health` | Check server health |
+| `GET`  | `/` | Serves the interactive Business Dashboard UI |
+| `POST` | `/session/new` | Creates a new chat session and returns a `session_id` |
+| `POST` | `/chat` | Send a message to the bot (requires `session_id`) |
+| `GET`  | `/analytics` | Returns aggregated business intelligence data + charts |
+| `GET`  | `/stats` | Returns high-level server KPIs |
+| `POST` | `/refresh_context` | Triggers a sync with Google Drive |
+| `GET`  | `/sync_status` | Returns the current progress of the Drive sync |
 
 ### `/chat` Request Body
 ```json
 {
-  "message": "Your question here",
-  "history": [
-    { "role": "user",      "content": "Previous question" },
-    { "role": "assistant", "content": "Previous answer" }
-  ]
+  "message": "What is the return policy?",
+  "session_id": "your-uuid-string-here"
 }
 ```
 
 ### 🔒 API Key Header (Production)
-Set `BOT_API_KEY` in `.env` to any secret string. All requests must then include the header:
+Set `BOT_API_KEY` in `.env` to any secret string. All API requests must then include the header:
 ```
 X-API-KEY: your-secret-key
 ```
@@ -156,28 +155,6 @@ The server **hot-reloads** on save, so changes take effect immediately.
 3. Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port 10000`
 4. Add Environment Variables on Render: `OPENAI_API_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `BOT_API_KEY`.
 5. **Important**: Run the bot locally first to generate `token.json`, then add its contents as a `token.json` Secret File on Render (under Environment → Secret Files).
-
-### Adding the Chat Widget to Your Website
-Once deployed (e.g., `https://my-chatbot.onrender.com`), call the API from your website's JavaScript:
-
-```javascript
-let history = [];
-
-async function sendMessage(userMessage) {
-  const res = await fetch("https://my-chatbot.onrender.com/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-KEY": "your-secret-key"
-    },
-    body: JSON.stringify({ message: userMessage, history: history })
-  });
-  const data = await res.json();
-  history.push({ role: "user", content: userMessage });
-  history.push({ role: "assistant", content: data.response });
-  return data.response;
-}
-```
 
 ---
 
