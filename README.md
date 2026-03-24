@@ -148,7 +148,7 @@ The server **hot-reloads** on save, so changes take effect immediately.
 
 ---
 
-## ☁️ The "Idiot-Proof" Step-by-Step Google Cloud Deployment
+## ☁️ Zero-Configuration Google Cloud Run Deployment
 
 Because GitHub has aggressive security scanners that **block you from uploading Google `credentials.json` files**, the absolute easiest way for a non-technical person to host this on Google Cloud is to deploy directly from your computer terminal. By doing this, your credentials, keys, and `.env` file are safely securely beamed straight to Google's servers without going through GitHub.
 
