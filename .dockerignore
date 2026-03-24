@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+venv/
+__pycache__/
+*.pyc
+
+# We specifically WANT these to go to the cloud container 
+# so you don't have to deal with Google Secret Manager file volume mounts.
+!credentials.json
+!token.json

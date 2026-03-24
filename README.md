@@ -150,11 +150,34 @@ The server **hot-reloads** on save, so changes take effect immediately.
 
 ## 🌐 Deploying to Production (Render.com)
 
-1. Push this repo to a **private** GitHub repository (your `.env`, `credentials.json`, `token.json` are all gitignored).
-2. Create a new **Web Service** on [render.com](https://render.com) connected to your repo.
-3. Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port 10000`
-4. Add Environment Variables on Render: `OPENAI_API_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `BOT_API_KEY`.
-5. **Important**: Run the bot locally first to generate `token.json`, then add its contents as a `token.json` Secret File on Render (under Environment → Secret Files).
+If you are a non-technical user, **Render.com** is by far the easiest way to host this, as GitHub completely blocks uploading Google `credentials.json` files for security reasons.
+
+1. Push this code to a **private** GitHub repository (your `.env`, `credentials.json`, `token.json` are hidden automatically).
+2. Go to [Render.com](https://render.com), create an account, and click **New → Web Service**.
+3. Connect your GitHub account and select your repository.
+4. Set the **Start Command** to: `uvicorn main:app --host 0.0.0.0 --port 10000`
+5. Click **Advanced**, and under Environment Variables, add:
+   - `OPENAI_API_KEY`: `sk-...`
+   - `GOOGLE_DRIVE_FOLDER_ID`: `your-folder-id`
+   - `BOT_API_KEY`: `your-secret-password-here`
+6. Under **Secret Files**, add two files. Copy the local contents of your files into them:
+   - Filename: `credentials.json` (Paste the contents of your local file here)
+   - Filename: `token.json` (Paste the contents of your local file here)
+7. Click **Deploy Web Service**!
+
+Your Business Dashboard is now live securely on the internet! 
+
+---
+
+## ☁️ Google Cloud Run Deployment (Technical)
+If you prefer Google Cloud, the easiest way to bypass GitHub's secret blockers is to push directly from your computer terminal rather than connecting GitHub:
+
+1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) and run `gcloud auth login`.
+2. Open your project folder in your terminal and run:
+   ```bash
+   gcloud run deploy faq-chatbot --source .
+   ```
+3. Because we configured `.dockerignore` to allow `credentials.json` and `token.json`, they will be securely uploaded straight from your PC into Google Cloud automatically, bypassing GitHub entirely.
 
 ---
 
