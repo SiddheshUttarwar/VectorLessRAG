@@ -1,5 +1,6 @@
 import os
 import io
+import json
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -7,6 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import PyPDF2
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
@@ -14,6 +16,7 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
 CONTEXT_CACHE_FILE = "context_cache.txt"
+STATE_FILE = "processed_files.json"
 
 def get_credentials():
     creds = None
@@ -50,22 +53,48 @@ def load_folder_contents():
     creds = get_credentials()
     service = build('drive', 'v3', credentials=creds)
     
-    # Query for all files in the designated folder
+    # Query for all files in the folder, paginating through all results
     query = f"'{FOLDER_ID}' in parents and trashed=false"
-    results = service.files().list(q=query, fields="nextPageToken, files(id, name, mimeType)").execute()
-    items = results.get('files', [])
+    items = []
+    page_token = None
+    while True:
+        kwargs = dict(q=query, fields="nextPageToken, files(id, name, mimeType, modifiedTime)")
+        if page_token:
+            kwargs["pageToken"] = page_token
+        results = service.files().list(**kwargs).execute()
+        items.extend(results.get('files', []))
+        page_token = results.get('nextPageToken')
+        if not page_token:
+            break
+
     
     if not items:
-        print("No files found in the specified folder.")
+        print("No files found in the specified Google Drive folder.")
         return ""
     
-    all_context = ""
+    # Load previously processed files so we skip duplicates
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+    else:
+        state = {}
+
+    new_context = ""
+    updated_state = state.copy()
+    files_processed = 0
+
     for item in items:
         file_id = item['id']
         file_name = item['name']
         mime_type = item['mimeType']
+        modified_time = item.get('modifiedTime', '')
         
-        print(f"Processing {file_name} ({mime_type})...")
+        # Check if we have already extracted this exact version of the file
+        if file_id in state and state[file_id] == modified_time:
+            continue
+            
+        print(f"Processing new/updated file: {file_name} ({mime_type})...")
+        files_processed += 1
         
         try:
             content = ""
@@ -113,17 +142,67 @@ def load_folder_contents():
                 print(f"Skipping unsupported MIME type: {mime_type} for file {file_name}")
                 continue
                 
-            # Append to massive context string block
-            all_context += f"--- START OF DOCUMENT: {file_name} ---\n{content}\n--- END OF DOCUMENT ---\n\n"
+            # Append only the new file to the new_context string
+            new_context += f"--- START OF NEW/UPDATED DOCUMENT: {file_name} ---\n{content}\n--- END OF DOCUMENT ---\n\n"
+            updated_state[file_id] = modified_time
         except Exception as e:
             print(f"Failed to process {file_name}: {e}")
             
-    # Write aggregated context to the local cache
-    with open(CONTEXT_CACHE_FILE, "w", encoding="utf-8") as f:
-        f.write(all_context)
+    # If no files were updated or added, we stop here entirely and skip OpenAI!
+    if files_processed == 0:
+        print("No new or updated files found in Google Drive. Knowledge base is already up to date!")
+        if os.path.exists(CONTEXT_CACHE_FILE):
+            with open(CONTEXT_CACHE_FILE, "r", encoding="utf-8") as f:
+                return f.read()
+        return ""
+            
+    print(f"Extracted {files_processed} new/updated files. Merging into existing Knowledge Base via OpenAI...")
     
-    print(f"Successfully wrote all content to {CONTEXT_CACHE_FILE}")
-    return all_context
+    existing_kb = ""
+    if os.path.exists(CONTEXT_CACHE_FILE):
+        with open(CONTEXT_CACHE_FILE, "r", encoding="utf-8") as f:
+            existing_kb = f.read()
+
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        system_prompt = (
+            "You are an expert data compiler maintaining a Knowledge Base. "
+            "You will be provided with the EXISTING knowledge base (if any) and a set of NEW or UPDATED documents. "
+            "Your job is to cleanly merge the new information into the existing knowledge base. "
+            "If the new documents contain updated facts that conflict with the old ones, replace the old facts and prioritize the new ones. "
+            "Remove any duplicate information, ensure the structure remains highly clean and concise, "
+            "and do NOT lose any unique facts or meaningful data points. "
+            "Return ONLY the completely updated knowledge base markdown text."
+        )
+        
+        user_prompt = f"### EXISTING KNOWLEDGE BASE ###\n{existing_kb}\n\n### NEW/UPDATED DOCUMENTS ###\n{new_context}"
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.1
+        )
+        final_context = response.choices[0].message.content
+        print("Incremental Update successful!")
+        
+        # Save the new state so these files are ignored next time
+        with open(STATE_FILE, "w") as f:
+            json.dump(updated_state, f)
+            
+    except Exception as e:
+        print(f"Failed to update context via OpenAI: {e}")
+        # If OpenAI fails, simply append raw text without updating state JSON so it retries next time
+        final_context = existing_kb + "\n\n" + new_context
+        
+    # Overwrite the cache with the new merged Knowledge Base
+    with open(CONTEXT_CACHE_FILE, "w", encoding="utf-8") as f:
+        f.write(final_context)
+    
+    print(f"Successfully wrote optimized summary to {CONTEXT_CACHE_FILE}")
+    return final_context
 
 if __name__ == '__main__':
     load_folder_contents()

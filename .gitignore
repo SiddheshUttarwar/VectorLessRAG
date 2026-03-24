@@ -4,5 +4,6 @@ __pycache__/
 credentials.json
 token.json
 context_cache.txt
+processed_files.json
 *.pyc
 .DS_Store
